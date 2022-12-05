@@ -24,18 +24,14 @@ Approach
 
 use std::collections::HashMap;
 
-struct CrateStack {
-    crates: Vec<i32>,
-}
-
 struct Instruction {
     source: i32,
     destination: i32,
     number_of_crates: i32,
 }
 
-struct Crates {
-    stacks: HashMap<i32, CrateStack>,
+struct Crates<'a> {
+    stacks: HashMap<usize, Vec<&'a str>>,
 }
 
 impl Crates {
@@ -62,29 +58,58 @@ impl Crates {
     }
 }
 
-fn parse_input(input: &str) -> (Crates, Vec<Instruction>) {
-    let mut stacks = HashMap::new();
-    let mut instructions = Vec::new();
-
-    for line in input.lines() {
-        if line.contains("move") {
-            let instruction = parse_instruction(line);
-            instructions.push(instruction);
-        } else {
-            let stack = parse_stack(line);
-            stacks.insert(stack.name.clone(), stack);
-        }
-    }
-
-    (Crates { stacks }, instructions)
-}
-
 fn parse_instruction(line: &str) -> Instruction {
     let mut parts = line.split_whitespace();
-    let number_of_crates : i32 = parts.nth(1)
-    let source : i32 = parts.nth(3);
-    let destination: i32 = parts.nth(5);
+
+    // Parse each part and convert to i32 (without using unwrap)
+    let number_of_crates : i32 = match parts.nth(1).expect("Number of Crates not Found").parse() {
+        Ok(num) => num,
+        Err(_) => panic!("Could not parse number of crates"),
+    };
+    let source : i32 = match parts.nth(3).expect("Source not Found").parse() {
+        Ok(num) => num,
+        Err(_) => panic!("Could not parse source"),
+    };
+    let destination : i32 = match parts.nth(5).expect("Destination not Found").parse() {
+        Ok(num) => num,
+        Err(_) => panic!("Could not parse destination"),
+    };
     Instruction { source: source, destination: destination, number_of_crates: number_of_crates }
+}
+
+fn parse_stack_input(input: &str) -> Crates {
+    let mut stacks: HashMap<usize, Vec<&str>> = HashMap::new();
+    let mut stack_line_indices : HashMap<usize,usize> = HashMap::new();
+
+    for (y, line) in input.lines().rev().enumerate() {
+
+        for (x, char) in line.chars().enumerate() {
+            if char.is_numeric() {
+                let index = char.to_digit(10).unwrap() as usize;
+                stacks.insert(index, Vec::new());
+                stack_line_indices.insert(index, y as usize);
+            }
+            if char.is_alphabetic() {
+                let index: usize = stack_line_indices.get(&x).unwrap().to_owned();
+                let stack = match stacks.get_mut(&index) {
+                    Some(stack) => stack,
+                    None => panic!("Stack not found"),
+                };
+                stack.push(&char.to_string());
+            }
+        }
+    }
+    Crates { stacks}
+}
+
+fn parse_input(input: &str) -> ( Crates, Vec<Instruction>) {
+    // We know there's a blank space between the instructions
+    // and the stacks, so we can split the input into two parts
+    let parts : Vec<&str> = input.split("\n").collect();
+    let stacks_input = parse_stack_input(input);
+    let instructions = parts[1].lines().map(|line| parse_instruction(line)).collect();
+
+    (stacks_input, instructions)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {

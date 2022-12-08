@@ -64,11 +64,12 @@ fn get_edges(grid: &Grid) -> Vec<(usize, usize)> {
     edges
 }
 
+#[derive(Debug)]
 enum Direction {
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT,
+    UP(i32, i32),
+    DOWN(i32, i32),
+    LEFT(i32, i32),
+    RIGHT(i32, i32),
 }
 
 fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) {
@@ -78,40 +79,53 @@ fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) 
         // We will check the direction of the edge and iterate over the nodes in that direction
         // If the edge X is 1 to len(x)-1, then we will iterate over the y values
         // If the edge Y is 1 to len(y)-1, then we will iterate over the x values
-        let direction;
-        
-        if (y > 0 && y < grid.height - 1) && (x == 0 || x == grid.width - 1) {
-            let direction = "VERTICAL";
-            
-        } else if (x > 0 && x < grid.width - 1) && (y == 0 || y == grid.height - 1) {
-            let direction = "HORIZONTAL";
+        let max_x = grid.width - 1;
+        let max_y = grid.height - 1;
+        let direction : Direction;
+       
+        if x == 0 {
+            direction = Direction::DOWN(1, 0);
+        } else if x == max_x {
+            direction = Direction::UP(-1, 0);
+        } else if y == 0 {
+            direction = Direction::RIGHT(0, 1);
+        } else if y == max_y {
+            direction = Direction::LEFT(0, -1);
         } else {
-            panic!("Edge is not on the edge of the grid");
+            panic!("Invalid edge");
         }
+        let mut current_node = (x, y);
+        let mut traversed_trees_height : Vec<u32> = Vec::new();
+        
+        while is_valid_node(current_node, grid) {
+            match direction {
+                Direction::UP(x, y) => current_node.0 = (current_node.0 as i32 + x) as usize,
+                Direction::DOWN(x, y) => current_node.0 = (current_node.0 as i32 + x) as usize,
+                Direction::LEFT(x, y) => current_node.1 = (current_node.1 as i32 + y) as usize,
+                Direction::RIGHT(x, y) => current_node.1 = (current_node.1 as i32 + y) as usize,
+            }
+            if !is_valid_node(current_node, grid) {
+                break;
+            }
 
-        match direction {
-            "HORIZONTAL" => {
-                for dy in 1..grid.height - 1 {
-                    let current_node_value = grid.get(x, dy);
-                    let previous_node_value = grid.get(x, y);
-                    if previous_node_value < current_node_value {
-                        visible_grid.set(x, dy, '1');
-                        previous_node = (x, dy);
-                    }
-                }
-            }
-            "VERTICAL" => {
-                for x in 1..grid.width - 1 {
-                    let current_node = (x, y);
-                    if grid.get(current_node) == '#' {
-                        visible_grid.set(current_node, '1');
-                        previous_node = current_node;
-                    }
-                }
-            }
-            _ => {}
+            let curr_tree_height = grid.grid[current_node.0][current_node.1];
+            let prev_tree_height = grid.grid[previous_node.0][previous_node.1];
+            
+            traversed_trees_height.push(prev_tree_height as u32);
+
+            // Ensure that the current node is higher than all the previous nodes
+            // If it is, then it is visible
+            if traversed_trees_height.iter().all(|&x| x < curr_tree_height as u32) {
+                visible_grid.grid[current_node.0][current_node.1] = '1';
+            } 
+            previous_node = current_node;
         }
     }
+}
+
+fn is_valid_node(current_node: (usize, usize), grid: &Grid) -> bool {
+    let (x, y) = current_node;
+    x < grid.width && y < grid.height
 }
 
 

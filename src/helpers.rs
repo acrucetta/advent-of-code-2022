@@ -21,7 +21,7 @@ mod grid {
         // A class used to read a grid and manipulate its positions
         // (x,y) where the top-left position is (0,0)
         pub grid: Vec<Vec<char>>,
-        pub width: usize,`
+        pub width: usize,
         pub height: usize,
     }
 

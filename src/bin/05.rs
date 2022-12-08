@@ -38,21 +38,29 @@ struct Crates {
 
 impl Crates {
     fn move_crates(&mut self, instruction: &Instruction) {
-        for _ in 0..instruction.number_of_crates {
-            let destination = instruction.destination;
-            let source = instruction.source;
-            let num_crates_to_move = instruction.number_of_crates;
-
-            for _ in 0..num_crates_to_move {
-                self.move_crate(source, destination);
-            }
+        let num_crates_to_move = instruction.number_of_crates;
+        for _ in 0..num_crates_to_move {
+            self.move_crate(&instruction.source, &instruction.destination);
         }
-    }
+        }
 
-    fn move_crate(&mut self, source: usize, destination: usize) {
-        print!("Moving crate from {} to {}...", source, destination)
+    fn move_crate(&mut self, source: &usize, destination: &usize) {
         let crate_to_move = self.stacks.get_mut(&source).unwrap().pop().unwrap();
         self.stacks.get_mut(&destination).unwrap().push(crate_to_move);
+    }
+
+    fn move_crates_in_order(&mut self, instruction: Instruction) {
+        // Instead of moving crates popping and pushing them, we can move them in order
+        // we grab the last N crates from the source stack and add them to the destination stack
+        let num_crates_to_move = instruction.number_of_crates;
+        let source = instruction.source;
+        let destination = instruction.destination;
+        let stack = self.stacks.get_mut(&source).unwrap();
+        // We can use the drain method to get the last N crates from the source stack
+        // We can use the extend method to add the crates to the destination stack
+        let crates_to_move : Vec<String> = stack.drain(stack.len() - num_crates_to_move..).collect();
+        self.stacks.get_mut(&destination).unwrap().extend(crates_to_move);
+
     }
 }
 
@@ -142,18 +150,30 @@ pub fn part_one(input: &str) -> Option<String> {
     for instruction in instructions {
         stacks.move_crates(&instruction);
     }
-
-    // Get the value at the top of the stack for each stack
-    // and add it to the top_stack_chars vector
-    for stack in stacks.stacks {
-        let top_stack_char = stack.1.last().unwrap().to_owned();
-        top_stack_chars.push(top_stack_char);
+    for key in 1..stacks.stacks.len()+1 {
+        let stack = stacks.stacks.get(&key).unwrap();
+        let top_char = stack.last().unwrap();
+        top_stack_chars.push(top_char.to_string());
     }
+    
     Some(top_stack_chars.join(""))
 }
 
 pub fn part_two(input: &str) -> Option<String> {
-    None
+    let mut top_stack_chars : Vec<String> = Vec::new();
+    let (mut stacks, instructions) = parse_input(input);
+
+    for instruction in instructions {
+        stacks.move_crates_in_order(instruction);
+    }
+
+    for key in 1..stacks.stacks.len()+1 {
+        let stack = stacks.stacks.get(&key).unwrap();
+        let top_char = stack.last().unwrap();
+        top_stack_chars.push(top_char.to_string());
+    }
+    
+    Some(top_stack_chars.join(""))
 }
 
 fn main() {

@@ -32,6 +32,16 @@ struct Range {
     end: i32,
 }
 
+impl Range {
+    fn contains (&self, other: &Range) -> bool {
+        self.start <= other.start && self.end >= other.end
+    }
+
+    fn overlap (&self, other: &Range) -> bool {
+        self.start <= other.end && self.end >= other.start
+    }
+}
+
 fn string_into_range(input: &str) -> Range {
     let mut split = input.split('-');
     let start = split.next().unwrap().parse::<i32>().unwrap();
@@ -40,32 +50,22 @@ fn string_into_range(input: &str) -> Range {
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    let mut overlaping_shifts: u32 = 0;
-
-    for line in input.lines() {
-        let assignment_ranges = line.split(",").collect::<Vec<_>>();
-        
-        let mut overlapping_shifts_indices = HashSet::new();
-
-        for (i, range) in assignment_ranges.iter().enumerate() {
-            let range_iter = string_into_range(range);
-            for (j, range2) in assignment_ranges.iter().enumerate() {
-                if i == j {
-                    continue;
-                }
-                let range2_iter = string_into_range(range2);
-                if range_iter.start >= range2_iter.start && range_iter.end <= range2_iter.end {
-                    let mut indices = vec![i, j];
-                    indices.sort();
-                    if !overlapping_shifts_indices.contains(&indices) {
-                        overlapping_shifts_indices.insert(indices);
-                        overlaping_shifts += 1;
-                    }
-                }
+    let ranges: Vec<Vec<Range>> = input
+        .lines()
+        .map(|line| line.split(',')) 
+        .map(|split| split.map(|range| string_into_range(range)).collect())
+        .collect();
+    
+   for vector in ranges.iter() {
+       for range in vector.iter() {
+        for other in vector.iter() {
+            if range.contains(other) {
+                println!("{} contains {}", range.start, other.start);
             }
         }
-    }
-    Some(overlaping_shifts)
+       }
+   }
+    None
 }
 
 

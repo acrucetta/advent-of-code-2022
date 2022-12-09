@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 /*
 Approach:
 - Use a grid class to load the input
@@ -15,7 +17,7 @@ Methods
 - walk_edges
 - get_visible_count from visible grid
 */
-use advent_of_code::helpers::grid::{Grid, ALL_DIRECTIONS, CARDINAL_DIRECTIONS};
+use advent_of_code::helpers::grid::{Grid, ALL_DIRECTIONS, CARDINAL_DIRECTIONS, self};
 
 fn load_grid(input: &str) -> Grid {
     let grid = input
@@ -72,7 +74,21 @@ enum Direction {
     RIGHT(i32, i32),
 }
 
-fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) {
+struct TreeScenic {
+    up: u32,
+    down: u32,
+    left: u32,
+    right: u32,
+}
+
+fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) -> HashMap<(usize, usize), TreeScenic> {
+    // We are going to keep track of each node
+    // and how many trees are visible from that node 
+    // We will use a hashmap to keep track of the nodes
+    // and a vec to grab the value of the visible trees
+    // from that node
+    let mut scenic_trees : HashMap<(usize, usize), TreeScenic> = HashMap::new();
+
     for (x, y) in edges {
         let mut previous_node = (x, y);
 
@@ -107,20 +123,37 @@ fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) 
             if !is_valid_node(current_node, grid) {
                 break;
             }
+            let curr_tree_height = grid.grid[current_node.0][current_node.1].to_digit(10).unwrap();
+            let prev_tree_height = grid.grid[previous_node.0][previous_node.1].to_digit(10).unwrap();
 
-            let curr_tree_height = grid.grid[current_node.0][current_node.1];
-            let prev_tree_height = grid.grid[previous_node.0][previous_node.1];
+            // Adding to the hashmap
+            if !scenic_trees.contains_key(&current_node) {
+                scenic_trees.insert(current_node, TreeScenic {up: 0, down: 0, left: 0, right: 0});
+            }
             
-            traversed_trees_height.push(prev_tree_height as u32);
+            traversed_trees_height.push(prev_tree_height);
 
             // Ensure that the current node is higher than all the previous nodes
             // If it is, then it is visible
-            if traversed_trees_height.iter().all(|&x| x < curr_tree_height as u32) {
+            if traversed_trees_height.iter().all(|&x| x < curr_tree_height) {
                 visible_grid.grid[current_node.0][current_node.1] = '1';
             } 
+            
+            // If the current node is higher or equal to the previous node
+            // then we will add the previous node to the hashmap
+            if curr_tree_height >= prev_tree_height {
+                let mut tree_scenic = scenic_trees.get_mut(&current_node).unwrap();
+                match direction {
+                    Direction::UP(x, y) => tree_scenic.up += 1,
+                    Direction::DOWN(x, y) => tree_scenic.down += 1,
+                    Direction::LEFT(x, y) => tree_scenic.left += 1,
+                    Direction::RIGHT(x, y) => tree_scenic.right += 1,
+                }
+            }
             previous_node = current_node;
         }
     }
+    scenic_trees
 }
 
 fn is_valid_node(current_node: (usize, usize), grid: &Grid) -> bool {
@@ -139,7 +172,15 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let grid = load_grid(input);
+    let mut visible_grid = create_visible_grid(grid.width, grid.height);
+    let edges = get_edges(&grid);
+    let visible_nodes = walk_edges(&grid, &mut visible_grid, edges);
+    
+    // Multiply each vector in the hashmap, and find the max
+    let tree_counts : Vec<u32> = visible_nodes.values().map(|x| x.up * x.down * x.left * x.right).collect();
+    let max = tree_counts.iter().max().unwrap();
+    Some(*max)
 }
 
 fn main() {

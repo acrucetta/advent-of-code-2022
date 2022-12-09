@@ -74,20 +74,10 @@ enum Direction {
     RIGHT(i32, i32),
 }
 
-struct TreeScenic {
-    up: u32,
-    down: u32,
-    left: u32,
-    right: u32,
-}
+fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) -> HashMap<(usize, usize), HashMap<String, u32>> {
 
-fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) -> HashMap<(usize, usize), TreeScenic> {
-    // We are going to keep track of each node
-    // and how many trees are visible from that node 
-    // We will use a hashmap to keep track of the nodes
-    // and a vec to grab the value of the visible trees
-    // from that node
-    let mut scenic_trees : HashMap<(usize, usize), TreeScenic> = HashMap::new();
+    // We will have a hash map with each node as a key, and a counter for each direction
+    let mut direction_counters : HashMap<(usize, usize), HashMap<String, u32>> = HashMap::new();
 
     for (x, y) in edges {
         let mut previous_node = (x, y);
@@ -126,10 +116,8 @@ fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) 
             let curr_tree_height = grid.grid[current_node.0][current_node.1].to_digit(10).unwrap();
             let prev_tree_height = grid.grid[previous_node.0][previous_node.1].to_digit(10).unwrap();
 
-            // Adding to the hashmap
-            if !scenic_trees.contains_key(&current_node) {
-                scenic_trees.insert(current_node, TreeScenic {up: 0, down: 0, left: 0, right: 0});
-            }
+            let curr_tree_height = grid.grid[current_node.0][current_node.1].to_digit(10).unwrap();
+            let prev_tree_height = grid.grid[previous_node.0][previous_node.1].to_digit(10).unwrap();
             
             traversed_trees_height.push(prev_tree_height);
 
@@ -138,22 +126,53 @@ fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) 
             if traversed_trees_height.iter().all(|&x| x < curr_tree_height) {
                 visible_grid.grid[current_node.0][current_node.1] = '1';
             } 
-            
-            // If the current node is higher or equal to the previous node
-            // then we will add the previous node to the hashmap
-            if curr_tree_height >= prev_tree_height {
-                let mut tree_scenic = scenic_trees.get_mut(&current_node).unwrap();
-                match direction {
-                    Direction::UP(x, y) => tree_scenic.up += 1,
-                    Direction::DOWN(x, y) => tree_scenic.down += 1,
-                    Direction::LEFT(x, y) => tree_scenic.left += 1,
-                    Direction::RIGHT(x, y) => tree_scenic.right += 1,
+
+            if !direction_counters.contains_key(&current_node) {
+                direction_counters.insert(current_node, HashMap::new());
+            }
+
+            // We are going to iterate over all the previous trees in 
+            // reverse direction until we find a tree that is higher than the current tree
+            // If we find a tree that is higher, then we will break out of the loop
+            // if we don't we increase the direction counter by 1
+            for tree_height in traversed_trees_height.iter().rev() {
+                if tree_height >= &curr_tree_height {
+                    increase_direction_counters(&direction, &mut direction_counters, current_node);
+                    break;
+                } else {
+                    // We will increase the counter in the direction of the edge
+                    increase_direction_counters(&direction, &mut direction_counters, current_node);
                 }
             }
             previous_node = current_node;
         }
     }
-    scenic_trees
+    direction_counters
+}
+
+fn increase_direction_counters(direction: &Direction, direction_counters: &mut HashMap<(usize, usize), HashMap<String, u32>>, current_node: (usize, usize)) {
+    match *direction {
+        Direction::UP(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("DOWN".to_string()).or_insert(0);
+            *counter += 1;
+        },
+        Direction::DOWN(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("UP".to_string()).or_insert(0);
+            *counter += 1;
+        },
+        Direction::LEFT(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("RIGHT".to_string()).or_insert(0);
+            *counter += 1;
+        },
+        Direction::RIGHT(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("LEFT".to_string()).or_insert(0);
+            *counter += 1;
+        },
+    }
 }
 
 fn is_valid_node(current_node: (usize, usize), grid: &Grid) -> bool {
@@ -175,12 +194,13 @@ pub fn part_two(input: &str) -> Option<u32> {
     let grid = load_grid(input);
     let mut visible_grid = create_visible_grid(grid.width, grid.height);
     let edges = get_edges(&grid);
-    let visible_nodes = walk_edges(&grid, &mut visible_grid, edges);
+    let direction_counters = walk_edges(&grid, &mut visible_grid, edges);
     
-    // Multiply each vector in the hashmap, and find the max
-    let tree_counts : Vec<u32> = visible_nodes.values().map(|x| x.up * x.down * x.left * x.right).collect();
-    let max = tree_counts.iter().max().unwrap();
-    Some(*max)
+    // We will multiply all the direction counters for each node against each other
+    // to get the total scenic score
+    let aggregated_scores_by_hashmap = direction_counters.iter().map(|(_, x)| x.iter().map(|(_, y)| y).product::<u32>());
+    let max_hashmap_score = aggregated_scores_by_hashmap.max().unwrap();
+    Some(max_hashmap_score)
 }
 
 fn main() {

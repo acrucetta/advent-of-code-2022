@@ -1,72 +1,109 @@
-/*
-Approach
-- Parse Instructions into Direction and Distance
-- Create grid with the max distance in each direction
-- Create a grid of booleans to track visited cells for TAILS
-- Create a method to move the tail and head
-- Create a method to track the head with respect to the tail
-    - If the tail is not within a single cell of the head, move the tail
- */
-
-use std::{collections::HashMap, hash::Hash, cmp::max};
+use std::{cmp::max, collections::{HashMap, HashSet}, hash::Hash};
 
 struct Direction {
     direction: String,
-    distance: u32,
+    distance: i32,
 }
 
 fn parse_directions(input: &str) -> Vec<Direction> {
-    input.lines().map(|line| {
-        let parsed_line: Vec<&str> = line.split_whitespace().collect();
-        Direction {
-            direction: parsed_line[0].to_string(),
-            distance: parsed_line[1].parse().unwrap(),
+    input
+        .lines()
+        .map(|line| {
+            let parsed_line: Vec<&str> = line.split_whitespace().collect();
+            Direction {
+                direction: parsed_line[0].to_string(),
+                distance: parsed_line[1].parse().unwrap(),
+            }
+        })
+        .collect()
+}
+
+
+
+fn walk_through_grid(movements : Vec<Direction>) -> HashSet<(i32, i32)> {
+    // This function will move the head and tail
+    // We will also update the visited grid for every position the tail has been in
+    let mut head: (i32, i32) = (0, 0);
+    let mut tail: (i32, i32) = (0, 0);
+    let mut tail_visits : HashSet<(i32, i32)> = HashSet::new();
+    tail_visits.insert(tail);
+    // We will move the head and tail by 1 step
+    // We will also update the visited grid for every position the tail has been in
+    // We will stop when we've finished all the movements
+    for mut movement in movements {
+        // Move Head
+        while movement.distance > 0 {
+            
+            if movement.direction == "R" {
+                head.1 += 1;
+            } else if movement.direction == "L" {
+                head.1 -= 1;
+            } else if movement.direction == "U" {
+                head.0 += 1;
+            } else if movement.direction == "D" {
+                head.0 -= 1;
+            }
+
+            // Reduce the distance by 1
+            movement.distance -= 1;
+            
+            // Move Tail
+            let (x_tail, y_tail) = tail;
+            let (x_diff, y_diff) = (head.0 - x_tail, head.1 - y_tail);
+
+            // If the tail is within 1 unit of the head, we skip
+            if x_diff.abs() <= 1 && y_diff.abs() <= 1 {
+                continue;
+            }
+            
+            if x_diff == 0 {
+                // We move the Y only (right or left)
+                // (0,+1/-1)
+                if y_diff > 0 {
+                    // We move the tail right
+                    tail.1 += 1;
+                } else {
+                    // We move the tail left
+                    tail.1 -= 1;
+                }
+            } else if y_diff == 0 {
+                // We move the X only (up or down)
+                // (+1/-1,0)
+                if x_diff > 0 {
+                    // We move the tail up
+                    tail.0 += 1;
+                } else {
+                    // We move the tail down
+                    tail.0 -= 1;
+                }
+            } else {
+                if x_diff > 0 {
+                    // Up
+                    tail.0 += 1;
+                } else {
+                    // Down
+                    tail.0 -= 1;
+                }
+                if y_diff > 0 {
+                    // Right
+                    tail.1 += 1;
+                } else {
+                    // Left
+                    tail.1 -= 1;
+                }
+            }
+            // Update tail visits
+            tail_visits.insert(tail);
         }
-    }).collect()
-}
-
-fn create_grid(max_directions : HashMap<String, u32>) -> Vec<Vec<bool>> {
-    let max_width = max(max_directions.get("R").unwrap(), max_directions.get("L").unwrap());
-    let max_height = max(max_directions.get("U").unwrap(), max_directions.get("D").unwrap());
-    let mut grid = vec![vec![false; *max_width as usize]; *max_height as usize];
-    grid
-}
-
-fn get_max_directions(directions : Vec<Direction>) -> HashMap<String, u32> {
-    let mut max_directions = HashMap::new();
-    max_directions.insert("R".to_string(), 0);
-    max_directions.insert("L".to_string(), 0);
-    max_directions.insert("U".to_string(), 0);
-    max_directions.insert("D".to_string(), 0);
-    for direction in directions {
-        let current_value = max_directions.get(&direction.direction).unwrap();
-        max_directions.insert(direction.direction, current_value + direction.distance);
     }
-    max_directions
+    tail_visits
 }
-
-/*
-Move Head (Grid, Curr Location, Direction)
-- Move step by step
-- Every time we move the head we will move the tail
-    - If the X coordinate is the same, we move the Y only (right or left)
-        (0,+1/-1)
-    - If the Y coordinate is the same, we move the X only (up or down)
-        (+1/-1,0)
-    - If the X and Y is different, we move diagonally
-        - E.g., (3,1) tails, (2,3) heads
-        - Difference is (-1,2)
-        - We need to close the difference to 1. We increase Y by 1 and X by 1
-        - (+1/-1,+1/-1)
-
-Update Visited Grid
-- For every position the tail has been in, we have a visited grid
-*/
 
 pub fn part_one(input: &str) -> Option<u32> {
     let movements = parse_directions(input);
-    let grid = create_grid(get_max_directions(movements));
-    None
+    let tail_visits = walk_through_grid(movements);
+    let total_tail_visits = tail_visits.len();
+    Some(total_tail_visits as u32)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {

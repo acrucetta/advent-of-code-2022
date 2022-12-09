@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 /*
 Approach:
 - Use a grid class to load the input
@@ -72,7 +74,11 @@ enum Direction {
     RIGHT(i32, i32),
 }
 
-fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) {
+fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) -> HashMap<(usize, usize), HashMap<String, u32>> {
+
+    // We will have a hash map with each node as a key, and a counter for each direction
+    let mut direction_counters : HashMap<(usize, usize), HashMap<String, u32>> = HashMap::new();
+
     for (x, y) in edges {
         let mut previous_node = (x, y);
 
@@ -108,8 +114,8 @@ fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) 
                 break;
             }
 
-            let curr_tree_height = grid.grid[current_node.0][current_node.1];
-            let prev_tree_height = grid.grid[previous_node.0][previous_node.1];
+            let curr_tree_height = grid.grid[current_node.0][current_node.1].to_digit(10).unwrap();
+            let prev_tree_height = grid.grid[previous_node.0][previous_node.1].to_digit(10).unwrap();
             
             traversed_trees_height.push(prev_tree_height as u32);
 
@@ -118,8 +124,52 @@ fn walk_edges(grid: &Grid, visible_grid: &mut Grid, edges: Vec<(usize, usize)>) 
             if traversed_trees_height.iter().all(|&x| x < curr_tree_height as u32) {
                 visible_grid.grid[current_node.0][current_node.1] = '1';
             } 
+
+            if !direction_counters.contains_key(&current_node) {
+                direction_counters.insert(current_node, HashMap::new());
+            }
+
+            // We are going to iterate over all the previous trees in 
+            // reverse direction until we find a tree that is higher than the current tree
+            // If we find a tree that is higher, then we will break out of the loop
+            // if we don't we increase the direction counter by 1
+            for tree_height in traversed_trees_height.iter().rev() {
+                if tree_height >= &curr_tree_height {
+                    increase_direction_counters(&direction, &mut direction_counters, current_node);
+                    break;
+                } else {
+                    // We will increase the counter in the direction of the edge
+                    increase_direction_counters(&direction, &mut direction_counters, current_node);
+                }
+            }
             previous_node = current_node;
         }
+    }
+    direction_counters
+}
+
+fn increase_direction_counters(direction: &Direction, direction_counters: &mut HashMap<(usize, usize), HashMap<String, u32>>, current_node: (usize, usize)) {
+    match *direction {
+        Direction::UP(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("DOWN".to_string()).or_insert(0);
+            *counter += 1;
+        },
+        Direction::DOWN(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("UP".to_string()).or_insert(0);
+            *counter += 1;
+        },
+        Direction::LEFT(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("RIGHT".to_string()).or_insert(0);
+            *counter += 1;
+        },
+        Direction::RIGHT(x, y) => {
+            let counter = direction_counters.get_mut(&current_node).unwrap();
+            let counter = counter.entry("LEFT".to_string()).or_insert(0);
+            *counter += 1;
+        },
     }
 }
 
@@ -139,7 +189,16 @@ pub fn part_one(input: &str) -> Option<u32> {
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let grid = load_grid(input);
+    let mut visible_grid = create_visible_grid(grid.width, grid.height);
+    let edges = get_edges(&grid);
+    let direction_counters = walk_edges(&grid, &mut visible_grid, edges);
+    
+    // We will multiply all the direction counters for each node against each other
+    // to get the total scenic score
+    let aggregated_scores_by_hashmap = direction_counters.iter().map(|(_, x)| x.iter().map(|(_, y)| y).product::<u32>());
+    let max_hashmap_score = aggregated_scores_by_hashmap.max().unwrap();
+    Some(max_hashmap_score)
 }
 
 fn main() {

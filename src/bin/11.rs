@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use regex::Regex;
 
 /*
@@ -7,20 +9,26 @@ Approach:
 - Add a structure for each turn
 - Add a structure for each round
 */
+
+#[derive(Clone)]
 struct Monkey {
     id: String,
-    items: Vec<i32>,
+    items: Vec<u64>,
     operation: Operation,
     test: Test,
+    inspections: u64,
 }
 
+#[derive(Clone)]
 struct Operation {
     operation: char,
     value: String,
 }
 
+#[derive(Clone)]
+
 struct Test {
-    divisible_by: i32,
+    divisible_by: u64,
     true_monkey_id: String,
     false_monkey_id: String,
 }
@@ -34,7 +42,7 @@ fn parse_input(input: &str) -> Vec<Monkey> {
         Test: divisible by 7
             If true: throw to monkey 6
             If false: throw to monkey 2
-    
+
     From this we will create a Monkey struct with the following fields:
     id: String
     items: Vec<i32>
@@ -44,9 +52,12 @@ fn parse_input(input: &str) -> Vec<Monkey> {
     // First we split the input into a vector of strings, each string being a monkey
     // we will be separating the input by a blank line between monkeys
     let unstructured_monkeys = input.split("Monkey").collect::<Vec<&str>>();
-    
+
     let mut structured_monkeys = Vec::new();
     for monkey in unstructured_monkeys {
+        if monkey.is_empty() {
+            continue;
+        }
         let id = parse_id(monkey);
         let items = parse_items(monkey);
         let operation = parse_operation(monkey);
@@ -56,11 +67,15 @@ fn parse_input(input: &str) -> Vec<Monkey> {
             items,
             operation,
             test,
+            inspections: 0,
         };
         structured_monkeys.push(monkey);
     }
-    
-    let structured_monkeys : Vec<Monkey> = structured_monkeys.into_iter().filter(|monkey| !monkey.id.is_empty()).collect();
+
+    let structured_monkeys: Vec<Monkey> = structured_monkeys
+        .into_iter()
+        .filter(|monkey| !monkey.id.is_empty())
+        .collect();
     structured_monkeys
 }
 
@@ -77,13 +92,19 @@ fn parse_id(input: &str) -> String {
             let re = Regex::new(r"^([\d]+):$").unwrap();
 
             // Try to extract the id from the input string.
-            id = re.captures(line).unwrap().get(1).unwrap().as_str().to_string();
+            id = re
+                .captures(line)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+                .to_string();
         }
     }
     id
 }
 
-fn parse_items(input: &str) -> Vec<i32> {
+fn parse_items(input: &str) -> Vec<u64> {
     let mut items = Vec::new();
     for line in input.lines() {
         // Strip line of whitespace
@@ -141,17 +162,36 @@ fn parse_test(input: &str) -> Test {
             // We will use regex to parse the operation, we will get 7
             // as the value.
             let re = Regex::new(r"^Test: divisible by ([\d]+)$").unwrap();
-            test.divisible_by = re.captures(line).unwrap().get(1).unwrap().as_str().parse().unwrap();
+            test.divisible_by = re
+                .captures(line)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()
+                .unwrap();
         }
         if line.starts_with("If true") {
             // parse the input of the form "If true: throw to monkey 6"
             let re = Regex::new(r"^If true: throw to monkey ([\d]+)$").unwrap();
-            test.true_monkey_id = re.captures(line).unwrap().get(1).unwrap().as_str().to_string();
+            test.true_monkey_id = re
+                .captures(line)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+                .to_string();
         }
         if line.starts_with("If false") {
             // parse the input of the form "If false: throw to monkey 2"
             let re = Regex::new(r"^If false: throw to monkey ([\d]+)$").unwrap();
-            test.false_monkey_id = re.captures(line).unwrap().get(1).unwrap().as_str().to_string();
+            test.false_monkey_id = re
+                .captures(line)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str()
+                .to_string();
         }
     }
     test
@@ -166,66 +206,89 @@ Monkey Round:
 - We will then test the worry level of the item and throw the item to respective monkey.
 */
 
-fn update_worry_level(monkey: &mut Monkey, item: i32) -> i32 {
+fn update_worry_level(monkey: &mut Monkey, item: u64) -> u64 {
     // If the monkey operation value is old, we will use the same item.
-    let item = if monkey.operation.value == "old" {
-        item
+    let operand: u64 = item;
+    let operand = if monkey.operation.value == "old" {
+        operand
     } else {
         monkey.operation.value.parse().unwrap()
     };
     let operation = monkey.operation.operation;
-    let worry_level: i32 = match operation {
-        '+' => item + item,
-        '-' => item - item,
-        '*' => item * item,
-        '/' => item / item,
-        _ => panic!("Invalid operation"),
+    let worry_level: u64 = match operation {
+        '+' => item + operand,
+        '-' => item - operand,
+        '*' => item * operand,
+        '/' => item / operand,
+        _ => panic!("value operation"),
     };
-    worry_level/3 
+    worry_level % item
 }
 
 fn monkey_round(monkeys: &mut Vec<Monkey>) {
-    for monkey in monkeys {
-        // Inspect the item
-        let item = monkey.items.remove(0);
+    // Items to move to each monkey
+    let mut items_to_move: HashMap<String, Vec<u64>> = monkeys
+        .iter()
+        .map(|monkey| (monkey.id.clone(), monkey.items.clone()))
+        .collect();
 
-        // Update the worry level
-        let worry_level = update_worry_level(monkey, item);
+    for monkey in monkeys.iter_mut() {
+        // While we have items to inspect, inspect them
+        while items_to_move.get(&monkey.id).unwrap().len() > 0 {
+            
+            // Inspect the item
+            let item = items_to_move.get_mut(&monkey.id).unwrap().remove(0);
+            monkey.inspections += 1;
 
-        // Test the worry level
-        if worry_level % monkey.test.divisible_by == 0 {
-            // Take the true monkey from the vector
-            let true_monkey = monkeys.iter_mut()
-                .find(|m| m.id == monkey.test.true_monkey_id)
-                .unwrap()
-                .take();
+            // Update the worry level
+            let worry_level:u64 = update_worry_level(monkey, item);
 
-            // Modify the true monkey
-            true_monkey.items.push(worry_level);
-
-            // Put the true monkey back in the vector
-            monkeys.push(true_monkey);
-
-        } else {
-            // Take the false monkey from the vector
-            let false_monkey = monkeys.iter_mut()
-                .find(|m| m.id == monkey.test.false_monkey_id)
-                .unwrap()
-                .take();
-
-            // Modify the false monkey
-            false_monkey.items.push(worry_level);
-
-            // Put the false monkey back in the vector
-            monkeys.push(false_monkey);
+            // Test the worry level
+            if worry_level % monkey.test.divisible_by == 0 {
+                // Add it to the items to move list with the monkey id
+                items_to_move
+                    .entry(monkey.test.true_monkey_id.clone())
+                    .or_insert(vec![])
+                    .push(worry_level);
+            } else {
+                // Add it to the items to move list with the monkey id
+                items_to_move
+                    .entry(monkey.test.false_monkey_id.clone())
+                    .or_insert(vec![])
+                    .push(worry_level);
+            }
         }
     }
+    monkeys.iter_mut().for_each(|monkey| {
+        monkey.items = items_to_move.get(&monkey.id).unwrap().clone();
+    });
 }
 
+pub fn part_one(input: &str) -> Option<u64> {
+    let mut monkeys = parse_input(input);
+    // Print initial state
+    println!("Initial state:");
+    for monkey in monkeys.iter() {
+        println!("Monkey {} items: {:?}", monkey.id, monkey.items);
+    }
 
-pub fn part_one(input: &str) -> Option<u32> {
-    let monkeys = parse_input(input);
-    Some(1)
+    for round in 1..=10000 {
+        monkey_round(&mut monkeys);
+
+        println!("Round: {}", round);
+        // Print the items of each monkey
+        for monkey in monkeys.iter() {
+            println!("Monkey {} items: {:?}", monkey.id, monkey.items);
+        }
+    }
+    // Print the inspect count of each monkey
+    for monkey in monkeys.iter() {
+        println!("Monkey {} inspect count: {}", monkey.id, monkey.inspections);
+    }
+    // Return the multiplication of the max two inspect counts
+    let mut inspect_counts: Vec<u64> = monkeys.iter().map(|monkey| monkey.inspections).collect();
+    inspect_counts.sort();
+    Some((inspect_counts[inspect_counts.len() - 1] * inspect_counts[inspect_counts.len() - 2]) as u64)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
